@@ -1,6 +1,7 @@
 #include "stream.h"
 #include "calibrate_square.h"
 #include "calibrate_panorama.h"
+#include "view.h"
 
 using namespace std;
 using std::vector;
@@ -32,15 +33,18 @@ calibrate_square *calib_square;
 calibrate_panorama *calib_pano;
 stream *this_stream;
 viewThread *vthread;
+view *image_viewer;
+
 
 stream::stream( )
 {
     calib_square = new calibrate_square();
     calib_pano = new calibrate_panorama();
     vthread = new viewThread();
+    image_viewer = new view();
     this_stream = this;
 }
-
+gpointer window_pointer;
 bool stream::buildpipeline()
 {
     //create pipeline elements
@@ -55,6 +59,7 @@ bool stream::buildpipeline()
     GstElement *rgbfilter;
 
     GstElement *appsrc_conv;
+    GstElement *queue;
 
     //create all requred elements
     loop = g_main_loop_new(NULL, false);
@@ -78,6 +83,7 @@ bool stream::buildpipeline()
     enc = gst_element_factory_make("ffenc_mpeg4", NULL);
     mux = gst_element_factory_make("mp4mux", NULL);
     sink = gst_element_factory_make("filesink", NULL);
+    queue = gst_element_factory_make("queue", NULL);
 
     //set filesink location
     g_object_set(sink, "location", "capture.mp4", NULL);
@@ -123,14 +129,16 @@ bool stream::buildpipeline()
         return false;
     }
 
+    g_object_set(queue, "max-size-buffers", 1, "leaky",2, NULL );
+
     //add to pipeline
-    gst_bin_add_many(GST_BIN(pipeline), src, depay, parse, decode,  scale,yuvfilter, conv, rgbfilter, conv1, appsink,  NULL);
+    gst_bin_add_many(GST_BIN(pipeline), src, depay, parse, decode,  scale,yuvfilter, conv, rgbfilter, conv1,queue,  appsink,  NULL);
 
     //add elements to warped pipeline
     gst_bin_add_many(GST_BIN(warped_pipe), appsrc,appsrc_caps,appsrc_conv, enc,mux,sink, NULL);
 
     //linki all static pads
-    if(!gst_element_link_many(depay, parse, decode, scale, yuvfilter,conv, rgbfilter, conv1, appsink, NULL)){
+    if(!gst_element_link_many(depay, parse, decode, scale, yuvfilter,conv, rgbfilter, conv1, queue,appsink, NULL)){
         g_printerr("could not link all elements\n");
         return false;
     }
@@ -139,6 +147,7 @@ bool stream::buildpipeline()
         g_print("could not link appsrc\n");
         return false;
     }
+
 
     //set callback for rtspsrc
     src_linked = false;
@@ -155,9 +164,10 @@ bool stream::buildpipeline()
     return true;
 }
 
-void stream::startstream()
+void stream::startstream(  )
 {
     GstPad* encpad;
+
     encpad = gst_element_get_static_pad(enc, "sink");
     //set pipeline to PLAYING
     gst_element_set_state(pipeline, GST_STATE_PLAYING);
@@ -254,6 +264,7 @@ GstFlowReturn new_buffer(GstAppSink *asink, gpointer data)
     //load image in opencv format to view thread
     Mat view;
     warped.copyTo(view);
+
     vthread->showImage(view);
 
     //convert to rgb for use with gstreamer
@@ -376,58 +387,10 @@ void viewThread::run()
     qDebug() << "viewThread running";
 }
 
-int topleftx, toplefty, bottomrightx, bottomrighty;
-//TODO check points in image
-
-void mouseCallback(int event, int x, int y, int flags, void* userdata)
-{
-    Q_UNUSED(flags);
-    Q_UNUSED(userdata);
-
-    //store top left co-ordinates
-    if ( event == EVENT_LBUTTONDOWN){
-        cout << "lbutton down, x: " << x << " y: " << y << endl;
-        topleftx = x;
-        toplefty = y;
-    }
-    //store bottom right coordinates
-    else if ( event == EVENT_LBUTTONUP){
-        cout << "lbutton up, x: " << x << " y: " << y << endl;
-        bottomrightx = x;
-        bottomrighty = y;
-        //if top left == bottom right close image
-        if(topleftx == bottomrightx || toplefty == bottomrighty){
-            topleftx = toplefty = bottomrightx = bottomrighty = 0;
-        }
-    }
-}
-
 void viewThread::showImage(Mat view)
 {
-    namedWindow("Dewarped");
-    setMouseCallback("Dewarped", mouseCallback);
-
-    //if rect has been drawn
-    if(bottomrightx != 0 && bottomrighty != 0){
-        Point p0(topleftx,toplefty);
-        Point p1(bottomrightx,bottomrighty);
-        //show rectangle on original image
-        rectangle(view, p0,p1,Scalar(0,0,255));
-        //show selected image in new window
-        Rect ROI(p0,p1);
-        Mat roi = view(ROI);
-        resize(roi,roi,Size(300,300));
-        namedWindow("roi");
-        imshow("roi", roi);
-    }else{
-        destroyWindow("roi");
-    }
-
-    imshow("Dewarped", view);
-
-    //if 'esc' key then break
-    char c = waitKey(10);
-    if(c == 27){
+    bool cont = image_viewer->showImage(view);
+    if(!cont){
         g_main_loop_quit(loop);
     }
 }

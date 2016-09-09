@@ -11,6 +11,7 @@
 #include <string>
 #include <stdio.h>
 #include <QtGui>
+#include <QtGui/QApplication>
 
 #include "gst/gst.h"
 #include "gst/app/gstappsink.h"
@@ -19,6 +20,8 @@
 #include "opencv2/opencv.hpp"
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/calib3d/calib3d.hpp"
+
+#include "mainwindow.h"
 
 using namespace std;
 using namespace cv;
@@ -29,7 +32,8 @@ class stream : public QObject
 public:
     stream( );
     bool buildpipeline();
-    void startstream();
+    void startstream( );
+
 
 };
 

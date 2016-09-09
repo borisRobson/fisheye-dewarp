@@ -21,11 +21,12 @@ SOURCES += main.cpp\
         mainwindow.cpp \
     calibrate_square.cpp \
     calibrate_panorama.cpp \
-    stream.cpp
-
+    stream.cpp \
+    view.cpp
 HEADERS  += mainwindow.h \
     calibrate_square.h \
     calibrate_panorama.h \
-    stream.h
+    stream.h \
+    view.h
 
 FORMS    += mainwindow.ui

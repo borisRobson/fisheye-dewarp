@@ -5,11 +5,12 @@
 #include "stream.h"
 #include "mainwindow.h"
 
+
 stream *strm;
+
 
 int main(int argc, char *argv[])
 {
-    //QCoreApplication app(argc, argv);
     QApplication app(argc,argv);
 
     strm = new stream();
@@ -17,7 +18,6 @@ int main(int argc, char *argv[])
     Task* task = new Task();
 
     MainWindow window;
-
     window.show();
 
     QObject::connect(task, SIGNAL(finished()),&app, SLOT(quit()));
