@@ -7,7 +7,7 @@
 
 Rect ROIs[3];
 bool roiSet[3];
-Scalar colour;
+Scalar colour[3];
 
 using namespace cv;
 using namespace std;
@@ -42,18 +42,21 @@ void mouseCallback(int event, int x, int y, int flags, void* userdata)
         bottomrighty = y;
         //if top left == bottom right close image
         if(topleftx == bottomrightx || toplefty == bottomrighty){
-            topleftx = toplefty = bottomrightx = bottomrighty = 0;
+            topleftx = toplefty = bottomrightx = bottomrighty = 0;     
         }
-    }
+    }    
 }
 
 bool view::showImage(Mat img)
 {
+    //create window and set call back
     namedWindow("Dewarped");
     setMouseCallback("Dewarped", mouseCallback);
 
+    //draw any ROI's
     Mat image = drawRect(img);
 
+    //show the image
     imshow("Dewarped", image);
 
     //if 'esc' key then break
@@ -72,65 +75,54 @@ Mat view::drawRect(Mat img)
             || toplefty > img.rows || bottomrighty > img.rows){
         topleftx = toplefty = bottomrightx = bottomrighty = 0;
     }
-    //if rect has been drawn
-    if(bottomrightx != 0 && bottomrighty != 0){
-        Point p0(topleftx,toplefty);
-        Point p1(bottomrightx,bottomrighty);
 
-        //show rectangle on original image
-        rectangle(img, p0,p1,colour);
-        //show selected image in new window
-        Rect ROI(p0,p1);
+    Point p0(topleftx,toplefty);
+    Point p1(bottomrightx,bottomrighty);
+    Rect ROI(p0,p1);
 
-        if(roiSet[0] == true){
-            ROIs[0] = ROI;
-        }
-        else if(roiSet[1] == true){
-            ROIs[1] = ROI;
-        }
-        else{
-            ROIs[2] = ROI;
+    char name[12];
+    //determine which view is selected
+    for(int i = 0; i < 3; i ++){
+        if(roiSet[i] == true){
+            ROIs[i] = ROI;
         }
 
-        Mat roi = img(ROI);
-        resize(roi,roi,Size(300,300));
-        namedWindow("roi");
-        imshow("roi", roi);
+        //if set
+        if(ROIs[i].width != 0){
+            //draw rectangle on original image
+            //rectangle(img, ROIs[i], colour[i]);
 
-    }else{
-        if(roiSet[0] == true){
-            ROIs[0] = Rect(Point(0,0), Point(0,0));
+            //create and display selcted region of interest in new window
+            Mat roi = img(ROIs[i]);
+            resize(roi,roi,Size(300,300));
+            sprintf(name, "roi %d", i);
+            imshow(name, roi);
         }
-        else if(roiSet[1] == true){
-            ROIs[1] = Rect(Point(0,0), Point(0,0));
-        }
-        else{
-            ROIs[2] = Rect(Point(0,0), Point(0,0));
-        }
-        destroyWindow("roi");
     }
+    //return panoramic image with any/no ROI's drawn on
     return img;
 }
 
 void view::selectView(int index)
 {
+    //switch viewSet property and box colour
     switch(index){
         case 0:{
             roiSet[0] = true;
             roiSet[1] = roiSet[2] = false;
-            colour = Scalar(0,0,255);
+            colour[0] = Scalar(0,0,255);
             break;
         }
         case 1:{
             roiSet[1] = true;
             roiSet[0] = roiSet[2] = false;
-            colour = Scalar(0,255,0);
+            colour[1] = Scalar(0,255,0);
             break;
         }
         case 2:{
             roiSet[2] = true;
             roiSet[1] = roiSet[0] = false;
-            colour = Scalar(255,0,0);
+            colour[2] = Scalar(255,0,0);
             break;
         }
     }
